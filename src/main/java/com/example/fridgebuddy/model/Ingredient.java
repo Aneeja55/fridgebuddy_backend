@@ -1,9 +1,10 @@
 package com.example.fridgebuddy.model;
-import java.util.List;
+
 import jakarta.persistence.*;
 import lombok.*;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDate;
+import java.util.List;
 
 @Entity
 @Table(name = "ingredients")
@@ -11,17 +12,11 @@ import java.time.LocalDate;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Ingredient {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @OneToMany(mappedBy = "ingredient", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIgnoreProperties("ingredient")
-    private List<Notification> notifications;
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User user;
 
     private String name;
     private String category;
@@ -29,5 +24,13 @@ public class Ingredient {
     private LocalDate expiryDate;
 
     @Enumerated(EnumType.STRING)
-    private IngredientStatus status = IngredientStatus.AVAILABLE;
+    private IngredientStatus status;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    @OneToMany(mappedBy = "ingredient", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore  // ✅ Prevent endless nesting
+    private List<Notification> notifications;
 }

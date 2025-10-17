@@ -1,63 +1,65 @@
 package com.example.fridgebuddy.service;
 
-import com.example.fridgebuddy.model.Ingredient;
 import com.example.fridgebuddy.model.Notification;
 import com.example.fridgebuddy.model.User;
-import com.example.fridgebuddy.repository.IngredientRepository;
+import com.example.fridgebuddy.model.Ingredient;
 import com.example.fridgebuddy.repository.NotificationRepository;
-import com.example.fridgebuddy.repository.UserRepository;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class NotificationService {
-    private final IngredientRepository ingredientRepository;
-    private final NotificationRepository notificationRepository;
-    private final UserRepository userRepository;
 
-    public NotificationService(IngredientRepository ingredientRepository,
-                               NotificationRepository notificationRepository,
-                               UserRepository userRepository) {
-        this.ingredientRepository = ingredientRepository;
-        this.notificationRepository = notificationRepository;
-        this.userRepository = userRepository;
+    private final NotificationRepository repository;
+
+    public NotificationService(NotificationRepository repository) {
+        this.repository = repository;
     }
 
-    public void generateForUser(Long userId) {
-        LocalDate start = LocalDate.now();
-        LocalDate end = start.plusDays(3);
-        List<Ingredient> expiring = ingredientRepository.findExpiringBetween(userId, start, end);
+    // ✅ Create a notification
+    public void createNotification(String message, User user, Ingredient ingredient) {
+        Notification n = new Notification(message, user, ingredient);
+        n.setCreatedAt(LocalDateTime.now());
+        repository.save(n);
+    }
 
-        for (Ingredient i : expiring) {
-            if (notificationRepository.existsByIngredientIdAndSeenFalse(i.getId())) continue;
-            Notification n = new Notification();
-            n.setUser(i.getUser());
-            n.setIngredient(i);
-            n.setMessage(i.getName() + " is expiring on " + i.getExpiryDate());
-            n.setSeen(false);
-            notificationRepository.save(n);
+    // ✅ Get notifications for a specific user
+    public List<Notification> getByUser(Long userId) {
+        return repository.findByUserIdOrderByCreatedAtDesc(userId);
+    }
+
+    // ✅ Mark all notifications as read
+    public void markAllSeen(Long userId) {
+        List<Notification> notifications = repository.findByUserIdOrderByCreatedAtDesc(userId);
+        for (Notification n : notifications) {
+            n.setSeen(true);
         }
+        repository.saveAll(notifications);
     }
 
-    @Scheduled(fixedRate = 60000)
-    public void scheduledGenerateForAllUsers() {
-        List<User> users = userRepository.findAll();
-        for (User u : users) {
-            if (u.getId() != null) generateForUser(u.getId());
+    // ✅ Delete notification when ingredient is deleted (optional)
+    public void deleteByIngredient(Long ingredientId) {
+        repository.deleteByIngredientId(ingredientId);
+    }
+
+    // ✅ Automatically generate expiry notifications
+    public void generateExpiryNotifications(User user, List<Ingredient> ingredients) {
+        for (Ingredient ingredient : ingredients) {
+            // Skip if already used
+            if (ingredient.getStatus() != null && ingredient.getStatus().name().equalsIgnoreCase("USED")) continue;
+
+            // Check if expired
+            if (ingredient.getExpiryDate() != null && ingredient.getExpiryDate().isBefore(LocalDate.now())) {
+                // Check if already notified
+                boolean exists = repository.existsByIngredientIdAndUserId(ingredient.getId(), user.getId());
+                if (!exists) {
+                    String msg = "⚠️ Your ingredient '" + ingredient.getName() + "' has expired!";
+                    createNotification(msg, user, ingredient);
+                }
+            }
         }
-    }
-
-    public List<Notification> getUnseen(Long userId) {
-        return notificationRepository.findByUserIdAndSeenFalse(userId);
-    }
-
-    public Notification markSeen(Long id) {
-        Notification n = notificationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
-        n.setSeen(true);
-        return notificationRepository.save(n);
     }
 }

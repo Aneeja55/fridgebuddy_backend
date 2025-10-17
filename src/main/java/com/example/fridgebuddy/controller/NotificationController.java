@@ -2,7 +2,9 @@ package com.example.fridgebuddy.controller;
 
 import com.example.fridgebuddy.dto.NotificationResponse;
 import com.example.fridgebuddy.model.Notification;
+import com.example.fridgebuddy.model.User;
 import com.example.fridgebuddy.service.NotificationService;
+import com.example.fridgebuddy.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,28 +17,35 @@ import java.util.stream.Collectors;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final UserRepository userRepository;
 
-    public NotificationController(NotificationService notificationService) {
+    public NotificationController(NotificationService notificationService, UserRepository userRepository) {
         this.notificationService = notificationService;
+        this.userRepository = userRepository;
     }
 
+    // ✅ Automatically generate expiry notifications for a given user
     @PostMapping("/generate/{userId}")
     public ResponseEntity<?> generate(@PathVariable Long userId) {
-        notificationService.generateForUser(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        notificationService.generateExpiryNotifications(user, user.getIngredients());
         return ResponseEntity.ok("Notifications generated for user " + userId);
     }
 
+    // ✅ Get all notifications for a user
     @GetMapping("/{userId}")
-    public ResponseEntity<List<NotificationResponse>> getUnseen(@PathVariable Long userId) {
-        List<NotificationResponse> resp = notificationService.getUnseen(userId)
+    public ResponseEntity<List<NotificationResponse>> getByUser(@PathVariable Long userId) {
+        List<NotificationResponse> resp = notificationService.getByUser(userId)
                 .stream().map(this::map).collect(Collectors.toList());
         return ResponseEntity.ok(resp);
     }
 
-    @PutMapping("/{id}/seen")
-    public ResponseEntity<NotificationResponse> markSeen(@PathVariable Long id) {
-        Notification n = notificationService.markSeen(id);
-        return ResponseEntity.ok(map(n));
+    // ✅ Mark all notifications as seen
+    @PutMapping("/{userId}/seen")
+    public ResponseEntity<String> markAllSeen(@PathVariable Long userId) {
+        notificationService.markAllSeen(userId);
+        return ResponseEntity.ok("All notifications marked as seen.");
     }
 
     private NotificationResponse map(Notification n) {
