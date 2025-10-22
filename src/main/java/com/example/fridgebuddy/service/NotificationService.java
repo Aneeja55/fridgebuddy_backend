@@ -40,26 +40,45 @@ public class NotificationService {
         repository.saveAll(notifications);
     }
 
-    // ✅ Delete notification when ingredient is deleted (optional)
+    // ✅ Delete notification when ingredient is deleted
     public void deleteByIngredient(Long ingredientId) {
         repository.deleteByIngredientId(ingredientId);
     }
 
     // ✅ Automatically generate expiry notifications
     public void generateExpiryNotifications(User user, List<Ingredient> ingredients) {
-        for (Ingredient ingredient : ingredients) {
-            // Skip if already used
-            if (ingredient.getStatus() != null && ingredient.getStatus().name().equalsIgnoreCase("USED")) continue;
+        LocalDate today = LocalDate.now();
 
-            // Check if expired
-            if (ingredient.getExpiryDate() != null && ingredient.getExpiryDate().isBefore(LocalDate.now())) {
-                // Check if already notified
-                boolean exists = repository.existsByIngredientIdAndUserId(ingredient.getId(), user.getId());
+        for (Ingredient ingredient : ingredients) {
+            if (ingredient.getStatus() != null &&
+                    ingredient.getStatus().name().equalsIgnoreCase("USED")) {
+                continue; // skip used items
+            }
+
+            if (ingredient.getExpiryDate() == null) continue;
+
+            LocalDate expiryDate = ingredient.getExpiryDate();
+            long daysUntilExpiry = today.until(expiryDate).getDays();
+
+            // 🔸 Expired items
+            if (expiryDate.isBefore(today)) {
+                boolean exists = repository.existsByIngredientIdAndUserIdAndMessageContaining(
+                        ingredient.getId(), user.getId(), "has expired"
+                );
                 if (!exists) {
-                    String msg = "⚠️ Your ingredient '" + ingredient.getName() + "' has expired!";
+                    String msg = ingredient.getName() + " has expired on " + expiryDate + ".";
+                    createNotification(msg, user, ingredient);
+                }
+            } else if (daysUntilExpiry <= 3) {
+                boolean exists = repository.existsByIngredientIdAndUserIdAndMessageContaining(
+                        ingredient.getId(), user.getId(), "is expiring"
+                );
+                if (!exists) {
+                    String msg = ingredient.getName() + " is expiring on " + expiryDate + ".";
                     createNotification(msg, user, ingredient);
                 }
             }
+
         }
     }
 }

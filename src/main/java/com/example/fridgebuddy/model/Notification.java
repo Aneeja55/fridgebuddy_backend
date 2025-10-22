@@ -23,10 +23,9 @@ public class Notification {
     private User user;
 
     // 👇 Link each notification to an ingredient (for expiry alerts)
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "ingredient_id")
     private Ingredient ingredient;
-
     // ✅ Constructors
     public Notification() {}
 
