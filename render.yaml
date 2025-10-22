@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: fridgebuddy-backend
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:mysql://<your-db-host>:3306/fridge_buddy?useSSL=false&serverTimezone=UTC
+      - key: SPRING_DATASOURCE_USERNAME
+        value: <your_db_username>
+      - key: SPRING_DATASOURCE_PASSWORD
+        value: <your_db_password>
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: update
